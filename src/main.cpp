@@ -16,7 +16,7 @@
 #include "SERVO.h" 
 #include "MPU9250.h"
 #include "mpu9250_library.h"
-
+#include "trama_types.h"
 //Timers del FreeRTOS
 #include "timers.h"
 
