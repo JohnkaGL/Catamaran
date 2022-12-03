@@ -20,6 +20,20 @@ class MPU9250
         uint8_t getMagY_L();
         uint8_t getMagZ_H();
         uint8_t getMagZ_L();
+        ///
+        uint8_t getAccelX_H();
+        uint8_t getAccelX_L();
+        uint8_t getAccelY_H();
+        uint8_t getAccelY_L();
+        uint8_t getAccelZ_H();
+        uint8_t getAccelZ_L();
+        ///
+        uint8_t getGyroX_H();
+        uint8_t getGyroX_L();
+        uint8_t getGyroY_H();
+        uint8_t getGyroY_L();
+        uint8_t getGyroZ_H();
+        uint8_t getGyroZ_L();
         void setMagCalX(float bias,float scaleFactor); //Dar los valores de calibración {offset, escala} del eje x
         void setMagCalY(float bias,float scaleFactor); //Dar los valores de calibración {offset, escala} del eje y
         void setMagCalZ(float bias,float scaleFactor); //Dar los valores de calibración {offset, escala} del eje z

@@ -324,7 +324,21 @@ void processIMUTask(void *pvParameters){
         printf("Iniciando procesamiento de la IMU...\r\n");
         data_frameA.set_MagneX(IMU.getMagX_L(),IMU.getMagX_H());
         data_frameA.set_MagneY(IMU.getMagY_L(),IMU.getMagY_H());
-        data_frameA.set_MagneY(IMU.getMagZ_L(),IMU.getMagZ_H());
+        data_frameA.set_MagneZ(IMU.getMagZ_L(),IMU.getMagZ_H());
+
+        data_frameA.set_AccelXl(IMU.getAccelX_L());
+        data_frameA.set_AccelYl(IMU.getAccelY_L());
+        data_frameA.set_AccelZl(IMU.getAccelZ_L());
+        data_frameA.set_AccelXm(IMU.getAccelX_H());
+        data_frameA.set_AccelYm(IMU.getAccelY_H());
+        data_frameA.set_AccelZm(IMU.getAccelZ_H());
+        
+        data_frameA.set_GyroXl(IMU.getGyroX_L());
+        data_frameA.set_GyroYl(IMU.getGyroY_L());
+        data_frameA.set_GyroYl(IMU.getGyroZ_L());
+        data_frameA.set_GyroXm(IMU.getGyroX_H());
+        data_frameA.set_GyroYm(IMU.getGyroY_H());
+        data_frameA.set_GyroZm(IMU.getGyroZ_H());
         xEventGroupSetBits(xControlEventGroup, BIT_0);
     }
 }

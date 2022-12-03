@@ -210,3 +210,43 @@ uint8_t MPU9250::getMagZ_L(){
     return (_hzcounts&0x00ff);
 }
 
+// Acelerometro
+uint8_t MPU9250::getAccelX_H(){
+    return ((_axcounts&0xff00)>>8);
+}
+uint8_t MPU9250::getAccelY_H(){
+    return ((_aycounts&0xff00)>>8);
+}
+uint8_t MPU9250::getAccelZ_H(){
+    return ((_azcounts&0xff00)>>8);
+}
+uint8_t MPU9250::getAccelX_L(){
+    return (_axcounts&0x00ff);
+}
+uint8_t MPU9250::getAccelY_L(){
+    return (_aycounts&0x00ff);
+}
+uint8_t MPU9250::getAccelZ_L(){
+    return (_azcounts&0x00ff);
+}
+
+//Gyro
+uint8_t MPU9250::getGyroX_H(){
+    return ((_gxcounts&0xff00)>>8);
+}
+uint8_t MPU9250::getGyroY_H(){
+    return ((_gycounts&0xff00)>>8);
+}
+uint8_t MPU9250::getGyroZ_H(){
+    return ((_gzcounts&0xff00)>>8);
+}
+uint8_t MPU9250::getGyroX_L(){
+    return (_gxcounts&0x00ff);
+}
+uint8_t MPU9250::getGyroY_L(){
+    return (_gycounts&0x00ff);
+}
+uint8_t MPU9250::getGyroZ_L(){
+    return (_gzcounts&0x00ff);
+}
+
