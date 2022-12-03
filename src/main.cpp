@@ -66,12 +66,13 @@ bool GPSOK=0;
 
 NRF24 nrf(spi1, 9, 8);// inicializacion de objeto de transmisor
 MPU9250 IMU(i2c_default,4,5);//IMU object
-SERVO servo1(SERVO1_PIN,90);//Servo Vela
+SERVO servo1(SERVO1_PIN,0);//Servo Vela
 SERVO servo2(SERVO2_PIN,90);//Servo timon
 
 //uint8_t Globalbuffer[32];
 char bufferin[32] {0};
-
+DATA_FRAME_TELEMETRYA data_frameA;
+DATA_FRAME_TELEMETRYB data_frameB;
 void on_uart_rx() {
     char ch;
     ch = uart_getc(UART_ID);
@@ -128,6 +129,7 @@ void UARTinit(){
 void InitHardware(){
     stdio_init_all();
     adc_init();
+    gpio_set_drive_strength(SERVO2_PIN,GPIO_DRIVE_STRENGTH_12MA);
     adc_gpio_init(26+0);
     adc_select_input(0);
     gpio_init(HOLE_PIN);
@@ -290,7 +292,7 @@ void readWindSpeedTask(void *pvParameters){
     while(true){
         xEventGroupValue = xEventGroupWaitBits(xMeasureEventGroup, xBitsToWaitFor, pdTRUE, pdTRUE, portMAX_DELAY);
         printf("Iniciando lectura de velocidad del viento...\r\n");
-        OUT[2]= (uint8_t) v_total*10;//Ajuste para reducir bits de envio
+        data_frameB.set_WindVel((uint8_t) v_total*10);//Ajuste para reducir bits de envio
         xEventGroupSetBits(xControlEventGroup, BIT_2);
     }
 }
@@ -320,12 +322,9 @@ void processIMUTask(void *pvParameters){
     while(true){
         xEventGroupValue = xEventGroupWaitBits(xProcEventGroup, xBitsToWaitfor, pdTRUE, pdTRUE, portMAX_DELAY);
         printf("Iniciando procesamiento de la IMU...\r\n");
-        OUT[3]=IMU.getMagX_H();
-        OUT[4]=IMU.getMagX_L();
-        OUT[5]=IMU.getMagY_H();
-        OUT[6]=IMU.getMagY_L();
-        OUT[7]=IMU.getMagZ_H();
-        OUT[8]=IMU.getMagZ_L();
+        data_frameA.set_MagneX(IMU.getMagX_L(),IMU.getMagX_H());
+        data_frameA.set_MagneY(IMU.getMagY_L(),IMU.getMagY_H());
+        data_frameA.set_MagneY(IMU.getMagZ_L(),IMU.getMagZ_H());
         xEventGroupSetBits(xControlEventGroup, BIT_0);
     }
 }
@@ -340,8 +339,7 @@ void processWindDirTask(void *pvParameters){
     while(true){
         xEventGroupValue = xEventGroupWaitBits(xProcEventGroup, xBitsToWaitfor, pdTRUE, pdTRUE, portMAX_DELAY);
         printf("Iniciando procesamiento de la dirección del viento...\r\n");
-        OUT[0]=(uint8_t)((dir&0xff00)>>8);
-        OUT[1]=(uint8_t)((dir&0x00ff));
+        data_frameB.set_WindDir((uint8_t)((dir&0x00ff)),(uint8_t)((dir&0xff00)>>8));
         xEventGroupSetBits(xControlEventGroup, BIT_1);
     }
 }
@@ -364,47 +362,38 @@ void processWiFiTask(void *pvParameters){
                     l++;
                     if (l==3){//Confirmar posición de la primera coma de interés (Latitud)
                         if(GPS1[r+1]==','){    //No se engancha                                        
-                            OUT[9]= '0';
-                            OUT[10]= '0';
-                            OUT[11]= '0';
-                            OUT[12]= '0';
-                            OUT[14]= '0';
-                            OUT[15]= '0';
-                            OUT[16]= '0';
-                            OUT[17]= '0';
+                            char lat[9]="00000000";
+                            data_frameB.set_Lat(lat);    //No se engancha                                        ;
                         }else{
-                            OUT[9]=  GPS1[r+2];
-                            OUT[10]= GPS1[r+3];
-                            OUT[11]= GPS1[r+4];
-                            OUT[12]= GPS1[r+6];
-                            OUT[14]= GPS1[r+7];
-                            OUT[15]= GPS1[r+8];
-                            OUT[16]= GPS1[r+9];
-                            OUT[17]= GPS1[r+10];
+                            char lat[8];
+                            lat[0]= GPS1[r+2];
+                            lat[1]= GPS1[r+3];
+                            lat[2]= GPS1[r+4];
+                            lat[3]= GPS1[r+6];
+                            lat[4]= GPS1[r+7];
+                            lat[5]= GPS1[r+8];
+                            lat[6]= GPS1[r+9];
+                            lat[7]= GPS1[r+10];
+                            data_frameB.set_Lat(lat);
 
                         }
                     }
                     if (l==5){//Confirmar posicion de la segunda coma de interés (Longitud)
                         if(GPS1[r+1]==','){                                            
-                            OUT[18]= '0';
-                            OUT[19]= '0';
-                            OUT[20]= '0';
-                            OUT[21]= '0';
-                            OUT[22]= '0';
-                            OUT[23]= '0';
-                            OUT[24]= '0';
-                            OUT[25]= '0';
-                            OUT[26]= '0';
+                            char lon[10]="000000000";
+                            data_frameB.set_Lon(lon);
                         }else{
-                            OUT[18]= GPS1[r+2];
-                            OUT[19]= GPS1[r+3];
-                            OUT[20]= GPS1[r+4];
-                            OUT[21]= GPS1[r+5];
-                            OUT[22]= GPS1[r+7];
-                            OUT[23]= GPS1[r+8];
-                            OUT[24]= GPS1[r+9];
-                            OUT[25]= GPS1[r+10];
-                            OUT[26]= GPS1[r+11];
+                            char lon[9];
+                            lon[0]= GPS1[r+2];
+                            lon[1]= GPS1[r+3];
+                            lon[2]= GPS1[r+4];
+                            lon[3]= GPS1[r+5];
+                            lon[4]= GPS1[r+7];
+                            lon[5]= GPS1[r+8];
+                            lon[6]= GPS1[r+9];
+                            lon[7]= GPS1[r+10];
+                            lon[8]= GPS1[r+11];
+                            data_frameB.set_Lon(lon);
                         }
                         break;
                     }
@@ -437,17 +426,23 @@ void controlActionTask(void *pvParameters){
 void sendPayloadTask(void *pvParameters){
     //Valor del grupo de eventos
     EventBits_t xEventGroupValue;
-
+    char *outA;
+    char *outB;
     //Bits del grupo de eventos por lo que se va a esperar
-   const EventBits_t xBitsToWaitfor = (BIT_0 | BIT_1 | BIT_2 | BIT_3);
+    const EventBits_t xBitsToWaitfor = (BIT_0 | BIT_1 | BIT_2 | BIT_3);
 
     while(true){
         xEventGroupValue = xEventGroupWaitBits(xControlEventGroup, xBitsToWaitfor, pdTRUE, pdTRUE, portMAX_DELAY);
         printf("---- < ENVIANDO PAYLOAD > ----\r\n");
         nrf.modeTX();
-        nrf.sendMessage(OUT);
+        outA=data_frameA.GetTrama();
+        outB=data_frameB.GetTrama();
+        nrf.sendMessage(outA);
+        sleep_ms(1);
+        nrf.sendMessage(outB);
         sleep_ms(1);
         nrf.modeRX();
-        bzero(OUT,32);
+        bzero(outA,32);
+        bzero(outB,32);
     }
 }
