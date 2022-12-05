@@ -423,6 +423,8 @@ void processWiFiTask(void *pvParameters){
                 
             }
             xEventGroupSetBits(xControlEventGroup, BIT_3);
+        }else{
+            xEventGroupSetBits(xMeasureEventGroup, BIT_3);
         }
         bzero(GPS1,100);
         m=0;
