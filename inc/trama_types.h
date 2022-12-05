@@ -87,14 +87,12 @@ class DATA_FRAME_TELEMETRYA{
             AccelYm=rTrama[12];
             AccelZl=rTrama[13];
             AccelZm=rTrama[14];
-            
             MagneXl=rTrama[16];
             MagneXm=rTrama[17];
             MagneYl=rTrama[18];
             MagneYm=rTrama[19];
             MagneZl=rTrama[20];
             MagneZm=rTrama[21];
-            
             Tail=rTrama[31];
         } 
 };
