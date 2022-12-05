@@ -20,14 +20,14 @@ class MPU9250
         uint8_t getMagY_L();
         uint8_t getMagZ_H();
         uint8_t getMagZ_L();
-        ///
+        ///Aceleracion
         uint8_t getAccelX_H();
         uint8_t getAccelX_L();
         uint8_t getAccelY_H();
         uint8_t getAccelY_L();
         uint8_t getAccelZ_H();
         uint8_t getAccelZ_L();
-        ///
+        ///Gyroscopo
         uint8_t getGyroX_H();
         uint8_t getGyroX_L();
         uint8_t getGyroY_H();

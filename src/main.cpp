@@ -9,8 +9,8 @@
 #include "hardware/spi.h"
 #include "hardware/i2c.h"
 #include "hardware/adc.h"
-//#include "hardware/timer.h"
 #include "hardware/gpio.h"
+//Librerias propias
 #include "NRF24.h"
 #include "NRF24L01_LIBRARY.h"
 #include "SERVO.h" 
@@ -31,6 +31,11 @@
 #define LED_PIN 25
 #define SERVO1_PIN 2 //timon
 #define SERVO2_PIN 0 //vela
+#define SERVO3_PIN 6 //timon2
+
+//Data transmision
+#define NRFCsn 9
+#define NRFCe 8
 
 //Wind
 #define HOLE_PIN 18
@@ -62,12 +67,14 @@ char OUT[32]={0};
 int i=0;
 int m=0;
 bool GPSOK=0;
+
 //Perifericos
 
-NRF24 nrf(spi1, 9, 8);// inicializacion de objeto de transmisor
-MPU9250 IMU(i2c_default,4,5);//IMU object
+NRF24 nrf(spi1, NRFCsn, NRFCe);// inicializacion de objeto de transmisor
+MPU9250 IMU(i2c_default,SDA,SCL);//IMU object
 SERVO servo1(SERVO1_PIN,0);//Servo Vela
 SERVO servo2(SERVO2_PIN,90);//Servo timon
+SERVO servo3(SERVO3_PIN,90);//Servo timon2
 
 //uint8_t Globalbuffer[32];
 char bufferin[32] {0};
@@ -142,7 +149,7 @@ void InitHardware(){
     nrf.modeRX();//     NRF
     UARTinit(); //      ESP/GPS
     IMU.init(); //      IMU
-    //while(!stdio_usb_connected());
+    //while(!stdio_usb_connected());//for testing purposes
 }
 //Event group de medida
 EventGroupHandle_t xMeasureEventGroup;
