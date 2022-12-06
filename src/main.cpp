@@ -10,6 +10,7 @@
 #include "hardware/i2c.h"
 #include "hardware/adc.h"
 #include "hardware/gpio.h"
+
 //Librerias propias
 #include "NRF24.h"
 #include "NRF24L01_LIBRARY.h"
@@ -17,6 +18,7 @@
 #include "MPU9250.h"
 #include "mpu9250_library.h"
 #include "trama_types.h"
+
 //Timers del FreeRTOS
 #include "timers.h"
 
@@ -32,12 +34,13 @@
 #define SERVO1_PIN 2 //timon
 #define SERVO2_PIN 0 //vela
 #define SERVO3_PIN 6 //timon2
+#define resol 45
 
-//Data transmision
+//NRF
 #define NRFCsn 9
 #define NRFCe 8
 
-//Wind
+//WIND
 #define HOLE_PIN 18
 
 //GPS
@@ -69,23 +72,26 @@ int m=0;
 bool GPSOK=0;
 
 //Perifericos
-
 NRF24 nrf(spi1, NRFCsn, NRFCe);// inicializacion de objeto de transmisor
 MPU9250 IMU(i2c_default,SDA,SCL);//IMU object
 SERVO servo1(SERVO1_PIN,0);//Servo Vela
 SERVO servo2(SERVO2_PIN,90);//Servo timon
 SERVO servo3(SERVO3_PIN,90);//Servo timon2
 
-//uint8_t Globalbuffer[32];
+//buffers
 char bufferin[32] {0};
 DATA_FRAME_TELEMETRYA data_frameA;
 DATA_FRAME_TELEMETRYB data_frameB;
+
+//Rutinas de atencion a la interrupción
 void on_uart_rx() {
     char ch;
     ch = uart_getc(UART_ID);
     if(ch=='\n'){
-        GPSOK=1;
-    }else{
+        if(GPS1[0]=='$' && GPS1[1]=='G' && GPS1[2]=='P' && GPS1[3]=='R' && GPS1[4]=='M' && GPS1[5]=='C'){
+            GPSOK=1;
+        }
+    }else if(!GPSOK){
         GPS1[m]=ch;
         m++;
     }
@@ -117,6 +123,7 @@ void hole(uint gpio,uint32_t events)
         }
     }
 }
+
 // funciones de inicialización
 void UARTinit(){
     // Set up our UART with a basic baud rate.
@@ -151,28 +158,32 @@ void InitHardware(){
     IMU.init(); //      IMU
     //while(!stdio_usb_connected());//for testing purposes
 }
+
 //Event group de medida
 EventGroupHandle_t xMeasureEventGroup;
 EventGroupHandle_t xProcEventGroup;
 EventGroupHandle_t xControlEventGroup;
 EventGroupHandle_t xReceivingEventGroup;
-// Tarea de revision de buffer de datos
+
+// Tarea de revision de buffer de datos y control
 void messageTask(void *pvParameters);
-//Tarea de recepcion de ordenes
-//void RxTask(void *pvParameters);
-//Tareas de loop de entrega
-void readIMUTask(void *pvParameters);//Leer magnetometro, giroscopio y acelerometro
+
+//Tareas de recoleccion de datos
+void readIMUTask(void *pvParameters); //Leer magnetometro, giroscopio y acelerometro
 void readWindDirTask(void *pvParameters);//Leer direccion del viento
 void readWindSpeedTask(void *pvParameters);//Velocidad del viento
-void readWiFi(void *pvParameters);
+void readWiFi(void *pvParameters);// Leer buffer GPS
 
+//Tareas de procesamiento de datos
 void processIMUTask(void *pvParameters);
 void processWindDirTask(void *pvParameters);
 void processWiFiTask(void *pvParameters);
 
+// Tareas de control
 void controlActionTask(void *pvParameters);
 void sendPayloadTask(void *pvParameters);
-//Tarea
+
+// Tarea de inicio
 void settingTask(void *pvParameters);
 
 int main()
@@ -220,6 +231,7 @@ int main()
     for(;;);
     return 0;
 }
+
 void messageTask(void *pvParamters){
     const TickType_t xDelay1sec = pdMS_TO_TICKS(200UL), xDontBlock = 0;
     while(true){
@@ -228,14 +240,14 @@ void messageTask(void *pvParamters){
             nrf.receiveMessage(bufferin);
             servo2.degrees((int) (bufferin[4]+3));//Servo Analogo, servo Timón
             if(bufferin[3]=='B'){
-                if(i<=178){
-                    i=i+2;
+                if(i<=(180-resol)){
+                    i=i+resol;
                     servo1.degrees(i);
                 }
             }
             else if(bufferin[2]=='C'){
-                if(i>=2){
-                    i=i-2;
+                if(i>=resol){
+                    i=i-resol;
                     servo1.degrees(i);
                 }
             }
@@ -244,13 +256,7 @@ void messageTask(void *pvParamters){
         }
     }
 }
-/*void RxTask(void *pvParameters){
-    EventBits_t xEventGroupValue;
-    const EventBits_t xBitsToWaitFor = BIT_0;
-    while(true){
-        xEventGroupValue = xEventGroupWaitBits(xReceivingEventGroup, xBitsToWaitFor, pdTRUE, pdTRUE, portMAX_DELAY);
-    }
-}*/
+
 void settingTask(void *pvParamters){
     const TickType_t xDelay1sec = pdMS_TO_TICKS(4000UL), xDontBlock = 0;
     while(true){
@@ -311,12 +317,12 @@ void readWiFi(void *pvParameters){
 
     while(true){
         xEventGroupValue = xEventGroupWaitBits(xMeasureEventGroup, xBitsToWaitFor, pdTRUE, pdTRUE, portMAX_DELAY);
-        printf("Iniciando lectura de módulos WiFi...\r\n");
+        printf("Iniciando lectura de módulos Uart...\r\n");
         if(GPSOK){
             xEventGroupSetBits(xProcEventGroup, BIT_2);
-            GPSOK=0;
         }
     }
+        
 }
 
 void processIMUTask(void *pvParameters){
@@ -374,61 +380,57 @@ void processWiFiTask(void *pvParameters){
 
     while(true){
         xEventGroupValue = xEventGroupWaitBits(xProcEventGroup, xBitsToWaitfor, pdTRUE, pdTRUE, portMAX_DELAY);
-        printf("Iniciando procesamiento del WiFi...\r\n");
-        if(GPS1[0]=='$' && GPS1[1]=='G' && GPS1[2]=='P' && GPS1[3]=='R' && GPS1[4]=='M' && GPS1[5]=='C'){
-            int l=0;
-            GPSOK=0;//si se identicica una trama de GPS aun no está listo
-            for(int r=6;r<m;r++){
-                if(GPS1[r]==','){
-                    l++;
-                    if (l==3){//Confirmar posición de la primera coma de interés (Latitud)
-                        if(GPS1[r+1]==','){    //No se engancha                                        
-                            char lat[9]="00000000";
-                            data_frameB.set_Lat(lat);    //No se engancha                                        ;
-                        }else{
-                            char lat[8];
-                            lat[0]= GPS1[r+2];
-                            lat[1]= GPS1[r+3];
-                            lat[2]= GPS1[r+4];
-                            lat[3]= GPS1[r+6];
-                            lat[4]= GPS1[r+7];
-                            lat[5]= GPS1[r+8];
-                            lat[6]= GPS1[r+9];
-                            lat[7]= GPS1[r+10];
-                            data_frameB.set_Lat(lat);
+        printf("Iniciando procesamiento del Uart...\r\n");
+        int l=0;
+        //GPSOK=0;//si se identicica una trama de GPS aun no está listo
+        for(int r=6;r<m;r++){
+            if(GPS1[r]==','){
+                l++;
+                if (l==3){//Confirmar posición de la primera coma de interés (Latitud)
+                    if(GPS1[r+1]==','){    //No se engancha                                        
+                        char lat[9]="00000000";
+                        data_frameB.set_Lat(lat);    //No se engancha                                        ;
+                    }else{
+                        char lat[8];
+                        lat[0]= GPS1[r+2];
+                        lat[1]= GPS1[r+3];
+                        lat[2]= GPS1[r+4];
+                        lat[3]= GPS1[r+6];
+                        lat[4]= GPS1[r+7];
+                        lat[5]= GPS1[r+8];
+                        lat[6]= GPS1[r+9];
+                        lat[7]= GPS1[r+10];
+                        data_frameB.set_Lat(lat);
 
-                        }
                     }
-                    if (l==5){//Confirmar posicion de la segunda coma de interés (Longitud)
-                        if(GPS1[r+1]==','){                                            
-                            char lon[10]="000000000";
-                            data_frameB.set_Lon(lon);
-                        }else{
-                            char lon[9];
-                            lon[0]= GPS1[r+2];
-                            lon[1]= GPS1[r+3];
-                            lon[2]= GPS1[r+4];
-                            lon[3]= GPS1[r+5];
-                            lon[4]= GPS1[r+7];
-                            lon[5]= GPS1[r+8];
-                            lon[6]= GPS1[r+9];
-                            lon[7]= GPS1[r+10];
-                            lon[8]= GPS1[r+11];
-                            data_frameB.set_Lon(lon);
-                        }
-                        break;
+                }
+                if (l==5){//Confirmar posicion de la segunda coma de interés (Longitud)
+                    if(GPS1[r+1]==','){                                            
+                        char lon[10]="000000000";
+                        data_frameB.set_Lon(lon);
+                    }else{
+                        char lon[9];
+                        lon[0]= GPS1[r+2];
+                        lon[1]= GPS1[r+3];
+                        lon[2]= GPS1[r+4];
+                        lon[3]= GPS1[r+5];
+                        lon[4]= GPS1[r+7];
+                        lon[5]= GPS1[r+8];
+                        lon[6]= GPS1[r+9];
+                        lon[7]= GPS1[r+10];
+                        lon[8]= GPS1[r+11];
+                        data_frameB.set_Lon(lon);
                     }
-                    
+                    break;
                 }
                 
             }
-            xEventGroupSetBits(xControlEventGroup, BIT_3);
-        }else{
-            xEventGroupSetBits(xMeasureEventGroup, BIT_3);
+            
         }
+        GPSOK=0;
+        xEventGroupSetBits(xControlEventGroup, BIT_3);
         bzero(GPS1,100);
         m=0;
-       //xEventGroupSetBits(xControlEventGroup, BIT_4);
     }
 }
 
