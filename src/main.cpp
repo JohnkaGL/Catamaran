@@ -31,9 +31,9 @@
 
 #define CONTROLTRIGGER (1UL << 3UL)|(1 << 2UL)|(1 << 1UL)|(1 << 0UL)
 #define LED_PIN 25
-#define SERVO1_PIN 2 //timon
-#define SERVO2_PIN 0 //vela
-#define SERVO3_PIN 6 //timon2
+#define SERVO1_PIN 2 //vela
+#define SERVO2_PIN 0 //timon
+//#define SERVO3_PIN 6 //timon2
 #define resol 45
 
 //NRF
@@ -76,7 +76,7 @@ NRF24 nrf(spi1, NRFCsn, NRFCe);// inicializacion de objeto de transmisor
 MPU9250 IMU(i2c_default,SDA,SCL);//IMU object
 SERVO servo1(SERVO1_PIN,0);//Servo Vela
 SERVO servo2(SERVO2_PIN,90);//Servo timon
-SERVO servo3(SERVO3_PIN,90);//Servo timon2
+//SERVO servo3(SERVO3_PIN,90);//Servo timon2
 
 //buffers
 char bufferin[32] {0};
@@ -85,15 +85,17 @@ DATA_FRAME_TELEMETRYB data_frameB;
 
 //Rutinas de atencion a la interrupción
 void on_uart_rx() {
-    char ch;
-    ch = uart_getc(UART_ID);
-    if(ch=='\n'){
-        if(GPS1[0]=='$' && GPS1[1]=='G' && GPS1[2]=='P' && GPS1[3]=='R' && GPS1[4]=='M' && GPS1[5]=='C'){
-            GPSOK=1;
+    if(!GPSOK){
+        char ch;
+        ch = uart_getc(UART_ID);
+        if(ch=='\n'){
+            if(GPS1[0]=='$' && GPS1[1]=='G' && GPS1[2]=='P' && GPS1[3]=='R' && GPS1[4]=='M' && GPS1[5]=='C'){
+                GPSOK=1;
+            }
+        }else{
+            GPS1[m]=ch;
+            m++;
         }
-    }else if(!GPSOK){
-        GPS1[m]=ch;
-        m++;
     }
 }
 void hole(uint gpio,uint32_t events)
@@ -130,19 +132,16 @@ void UARTinit(){
     uart_init(UART_ID, BAUD_RATE);
     gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
     gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
-    int __unused actual = uart_set_baudrate(UART_ID, BAUD_RATE);
-    uart_set_hw_flow(UART_ID, false, false);
-    uart_set_format(UART_ID, DATA_BITS, STOP_BITS, PARITY);
-    uart_set_fifo_enabled(UART_ID, false);
     int UART_IRQ = UART_ID == uart0 ? UART0_IRQ : UART1_IRQ;
     irq_set_exclusive_handler(UART_IRQ, on_uart_rx);
     irq_set_enabled(UART_IRQ, true);
     uart_set_irq_enables(UART_ID, true, false);
-    //uart_puts(UART_ID, "\nHello, uart interrupts\n");
+    uart_puts(UART_ID, "\nHello, uart interrupts\n");
 }
 void InitHardware(){
     stdio_init_all();
     adc_init();
+    gpio_set_drive_strength(SERVO1_PIN,GPIO_DRIVE_STRENGTH_12MA);
     gpio_set_drive_strength(SERVO2_PIN,GPIO_DRIVE_STRENGTH_12MA);
     adc_gpio_init(26+0);
     adc_select_input(0);
@@ -150,12 +149,15 @@ void InitHardware(){
     gpio_set_dir(HOLE_PIN, GPIO_IN);
     gpio_pull_down(HOLE_PIN);
     gpio_set_irq_enabled_with_callback(HOLE_PIN,0x04,1,hole);
-    //gpio_init(LED_PIN);
-    //gpio_set_dir(LED_PIN,1);//Definir como salida
+    
     nrf.config();
     nrf.modeRX();//     NRF
     UARTinit(); //      ESP/GPS
     IMU.init(); //      IMU
+
+    gpio_init(LED_PIN);
+    gpio_set_dir(LED_PIN, GPIO_OUT);//Definir como salida
+    gpio_put(LED_PIN,1);
     //while(!stdio_usb_connected());//for testing purposes
 }
 
@@ -238,7 +240,8 @@ void messageTask(void *pvParamters){
         vTaskDelay(xDelay1sec);
         if (nrf.newMessage()==1){
             nrf.receiveMessage(bufferin);
-            servo2.degrees((int) (bufferin[4]+3));//Servo Analogo, servo Timón
+            servo2.degrees((int) (bufferin[4]/2+45));//Servo Analogo, servo Timón
+            //Vela
             if(bufferin[3]=='B'){
                 if(i<=(180-resol)){
                     i=i+resol;
@@ -318,9 +321,8 @@ void readWiFi(void *pvParameters){
     while(true){
         xEventGroupValue = xEventGroupWaitBits(xMeasureEventGroup, xBitsToWaitFor, pdTRUE, pdTRUE, portMAX_DELAY);
         printf("Iniciando lectura de módulos Uart...\r\n");
-        if(GPSOK){
-            xEventGroupSetBits(xProcEventGroup, BIT_2);
-        }
+        xEventGroupSetBits(xProcEventGroup, BIT_2);
+        GPSOK=0;
     }
         
 }
@@ -365,7 +367,7 @@ void processWindDirTask(void *pvParameters){
 
     while(true){
         xEventGroupValue = xEventGroupWaitBits(xProcEventGroup, xBitsToWaitfor, pdTRUE, pdTRUE, portMAX_DELAY);
-        printf("Iniciando procesamiento de la dirección del viento...\r\n");
+        //printf("Iniciando procesamiento de la dirección del viento...\r\n");
         data_frameB.set_WindDir((uint8_t)((dir&0x00ff)),(uint8_t)((dir&0xff00)>>8));
         xEventGroupSetBits(xControlEventGroup, BIT_1);
     }
@@ -383,6 +385,10 @@ void processWiFiTask(void *pvParameters){
         printf("Iniciando procesamiento del Uart...\r\n");
         int l=0;
         //GPSOK=0;//si se identicica una trama de GPS aun no está listo
+        /*char lat[9]="00000000";
+        data_frameB.set_Lat(lat);    //No se engancha  
+        char lon[10]="000000000";
+        data_frameB.set_Lon(lon);*/   
         for(int r=6;r<m;r++){
             if(GPS1[r]==','){
                 l++;
@@ -427,10 +433,11 @@ void processWiFiTask(void *pvParameters){
             }
             
         }
-        GPSOK=0;
-        xEventGroupSetBits(xControlEventGroup, BIT_3);
+        //GPSOK=0;
+        
         bzero(GPS1,100);
         m=0;
+        xEventGroupSetBits(xControlEventGroup, BIT_3);
     }
 }
 
@@ -443,7 +450,7 @@ void controlActionTask(void *pvParameters){
 
     while(true){
         xEventGroupValue = xEventGroupWaitBits(xControlEventGroup, xBitsToWaitfor, pdTRUE, pdTRUE, portMAX_DELAY);
-        printf("---- < INICIANDO CONTROL > ----\r\n");
+        //printf("---- < INICIANDO CONTROL > ----\r\n");
         
     }
 }
