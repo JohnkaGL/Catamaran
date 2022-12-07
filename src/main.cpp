@@ -91,6 +91,9 @@ void on_uart_rx() {
         if(ch=='\n'){
             if(GPS1[0]=='$' && GPS1[1]=='G' && GPS1[2]=='P' && GPS1[3]=='R' && GPS1[4]=='M' && GPS1[5]=='C'){
                 GPSOK=1;
+            }else{
+                bzero(GPS1,100);
+                m=0; 
             }
         }else{
             GPS1[m]=ch;

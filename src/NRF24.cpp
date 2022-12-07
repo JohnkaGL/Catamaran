@@ -57,10 +57,10 @@ void NRF24::writeReg(uint8_t reg, uint8_t *data, uint8_t size){
 void NRF24::config(){
     ceLow();
     sleep_ms(11);//wait 10.3ms power on reset
-    writeReg(CONFIG, 0b00001010); // config. PWR_UP=1 ; EN_CRC=1 bit6=
+    writeReg(CONFIG, 0b00001010); // config. PWR_UP=1 ; EN_CRC=1 bit6
     sleep_us(1500);//Start up 1.5ms
     //STAND By I
-    writeReg(EN_AA,0); // no auto ack.
+    writeReg(EN_AA,0); // no auto ack.******
     writeReg(RF_CH,80); // channel. 
     writeReg(RX_ADDR_P0, (uint8_t*)"gyroc",5);//direccion de 5 bytes
     writeReg(TX_ADDR, (uint8_t*)"gyroc",5);//direccion de 5 bytes
